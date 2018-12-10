@@ -7,6 +7,8 @@ using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.Owin;
 using Microsoft.Owin.Security;
 using Democracy_CR.Models;
+using Microsoft.AspNet.Identity.EntityFramework;
+using System.Web.Security;
 
 namespace Democracy_CR.Controllers
 {
@@ -241,6 +243,66 @@ namespace Democracy_CR.Controllers
                 return RedirectToAction("Index", new { Message = ManageMessageId.ChangePasswordSuccess });
             }
             AddErrors(result);
+            return View(model);
+        }
+
+        //
+        // GET: /Manage/ChangePassword
+        public ActionResult ChangePasswordByUserName(int userId, string userName)
+        {
+            var view = new ChangePasswordUserNameViewModel
+            {
+                UserId = userId,
+                UserName = userName,
+                NewPassword = string.Empty,
+                ConfirmPassword = string.Empty,
+            };
+
+            return View(view);
+        }
+
+        //
+        // POST: /Manage/ChangePassword
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ChangePasswordByUserName(ChangePasswordUserNameViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var userContext = new ApplicationDbContext();
+            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(userContext));
+
+            /*var user = await UserManager.FindAsync(model.UserName, model.OldPassword);
+            if (user != null)
+            {
+                var result = await UserManager.ChangePasswordAsync(user.Id, model.OldPassword, model.NewPassword);
+                if (result.Succeeded)
+                {
+                    return RedirectToAction("Index", "Users");
+                }
+                AddErrors(result);
+            }
+            else
+            {
+                ModelState.AddModelError(string.Empty, "The system cannot validate this user for change the password");
+            }*/
+
+            var user = await UserManager.FindByNameAsync(model.UserName);
+            if (user != null)
+            {
+                var userId = user.Id;
+                userManager.RemovePassword(userId);
+                userManager.AddPassword(userId, model.ConfirmPassword);
+                return RedirectToAction("Index", "Users");
+            }
+            else
+            {
+                ModelState.AddModelError(string.Empty, "The system cannot validate this user for change the password");
+            }
+
             return View(model);
         }
 

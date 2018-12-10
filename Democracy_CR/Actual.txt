@@ -1,0 +1,7 @@
+﻿Video: 50, Minuto: 0:01
+
+Crystal Report:
+https://stackoverflow.com/questions/42902740/how-to-integrate-sap-crystal-reports-in-visual-studio-2017
+
+RDLC:
+http://shashangka.com/2017/05/17/enable-rdlc-reporting-in-visual-studio-2017/

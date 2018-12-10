@@ -58,6 +58,23 @@ namespace Democracy_CR.Models
         public string ConfirmPassword { get; set; }
     }
 
+    public class ChangePasswordUserNameViewModel
+    {
+        public int UserId { get; set; }
+        public string UserName { get; set; }
+
+        [Required]
+        [StringLength(100, ErrorMessage = "{0} debe tener al menos {2} caracteres de longitud.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Contraseña nueva")]
+        public string NewPassword { get; set; }
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirme la contraseña nueva")]
+        [Compare("NewPassword", ErrorMessage = "La contraseña nueva y la contraseña de confirmación no coinciden.")]
+        public string ConfirmPassword { get; set; }
+    }
+
     public class AddPhoneNumberViewModel
     {
         [Required]

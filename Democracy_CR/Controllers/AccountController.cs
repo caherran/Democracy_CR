@@ -9,6 +9,9 @@ using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.Owin;
 using Microsoft.Owin.Security;
 using Democracy_CR.Models;
+using Democracy_CR.Classes;
+using System.IO;
+using Microsoft.AspNet.Identity.EntityFramework;
 
 namespace Democracy_CR.Controllers
 {
@@ -68,7 +71,24 @@ namespace Democracy_CR.Controllers
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Login(LoginViewModel model, string returnUrl)
         {
-            if (!ModelState.IsValid)
+            if(ModelState.IsValid)
+            {
+                var user = await UserManager.FindAsync(model.Email, model.Password);
+                if(user != null)
+                {
+                    await SignInManager.SignInAsync(user, model.RememberMe, model.RememberMe);
+                    return RedirectToLocal(returnUrl);
+                }
+                else
+                {
+                    ModelState.AddModelError("", "Invalid email or password.");
+                }
+            }
+
+            return View(model);
+
+
+            /*if (!ModelState.IsValid)
             {
                 return View(model);
             }
@@ -88,7 +108,7 @@ namespace Democracy_CR.Controllers
                 default:
                     ModelState.AddModelError("", "Intento de inicio de sesión no válido.");
                     return View(model);
-            }
+            }*/
         }
 
         //
@@ -147,29 +167,90 @@ namespace Democracy_CR.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Register(RegisterViewModel model)
+        public async Task<ActionResult> Register(RegisterUserView userView)
         {
             if (ModelState.IsValid)
             {
-                var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
-                var result = await UserManager.CreateAsync(user, model.Password);
-                if (result.Succeeded)
-                {
-                    await SignInManager.SignInAsync(user, isPersistent:false, rememberBrowser:false);
-                    
-                    // Para obtener más información sobre cómo habilitar la confirmación de cuentas y el restablecimiento de contraseña, visite https://go.microsoft.com/fwlink/?LinkID=320771
-                    // Enviar correo electrónico con este vínculo
-                    // string code = await UserManager.GenerateEmailConfirmationTokenAsync(user.Id);
-                    // var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: Request.Url.Scheme);
-                    // await UserManager.SendEmailAsync(user.Id, "Confirmar cuenta", "Para confirmar la cuenta, haga clic <a href=\"" + callbackUrl + "\">aquí</a>");
+                var pic = string.Empty;
+                Utilities.UploadPhoto(userView.Photo, out pic);
 
+                //Save record
+                var user = new User
+                {
+                    Address = userView.Address,
+                    FirstName = userView.FirstName,
+                    LastName = userView.LastName,
+                    Grade = userView.Grade,
+                    Group = userView.Group,
+                    Phone = userView.Phone,
+                    Photo = pic == string.Empty ? string.Empty : string.Format("~/Content/Photos/{0}", pic),
+                    UserName = userView.UserName
+                };
+
+                var db = new DemocracyContext();
+
+                try
+                {
+                    db.Users.Add(user);
+                    db.SaveChanges();
+                    var userASP = this.CreateASPUser(userView);
+                    await SignInManager.SignInAsync(userASP, isPersistent: false, rememberBrowser: false);
                     return RedirectToAction("Index", "Home");
                 }
-                AddErrors(result);
+                catch (Exception ex)
+                {
+                    if (ex.InnerException != null &&
+                        ex.InnerException.InnerException != null &&
+                        ex.InnerException.InnerException.Message.Contains("EmailIndex"))
+                    {
+                        ModelState.AddModelError(
+                            string.Empty, 
+                            "The email has already used for another user");
+                    }
+                    else
+                    {
+                        ModelState.AddModelError(
+                            string.Empty,
+                            ex.Message);
+                    }
+                    return View(userView);
+                }
             }
 
             // Si llegamos a este punto, es que se ha producido un error y volvemos a mostrar el formulario
-            return View(model);
+            return View(userView);
+        }
+
+        private ApplicationUser CreateASPUser(RegisterUserView userView)
+        {
+            //User Management
+            var userContext = new ApplicationDbContext();
+            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(userContext));
+            var roleManager = new RoleManager<IdentityRole>(new RoleStore<IdentityRole>(userContext));
+
+            //Create User Role
+            string roleName = "User";
+
+            //Check to see if Role Exists, if not create it
+            if (!roleManager.RoleExists(roleName))
+            {
+                roleManager.Create(new IdentityRole(roleName));
+            }
+
+            var userASP = new ApplicationUser
+            {
+                UserName = userView.UserName,
+                Email = userView.UserName,
+                PhoneNumber = userView.Phone,
+            };
+
+            userManager.Create(userASP, userView.Password);
+
+            //Add User to Role
+            userASP = userManager.FindByName(userView.UserName);
+            userManager.AddToRole(userASP.Id, roleName);
+
+            return userASP;
         }
 
         //
